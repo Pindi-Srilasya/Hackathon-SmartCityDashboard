@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 const CityContext = createContext();
 
@@ -26,10 +27,10 @@ export const CityProvider = ({ children }) => {
     setLoading(true);
     try {
       const [weather, traffic, pollution, events] = await Promise.all([
-        axios.get(`http://localhost:5000/api/weather?city=${city}`),
-        axios.get(`http://localhost:5000/api/traffic`),
-        axios.get(`http://localhost:5000/api/pollution`),
-        axios.get(`http://localhost:5000/api/events?city=${city}`)
+        axios.get(`${API_BASE_URL}/api/weather?city=${city}`),
+        axios.get(`${API_BASE_URL}/api/traffic`),
+        axios.get(`${API_BASE_URL}/api/pollution`),
+        axios.get(`${API_BASE_URL}/api/events?city=${city}`)
       ]);
       
       setWeatherData(weather.data.data);
