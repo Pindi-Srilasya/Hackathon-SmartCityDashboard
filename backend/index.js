@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:3000", "https://*.vercel.app", "https://*.onrender.com"],
+    origin: ["http://localhost:5173", "http://localhost:3000", "https://hackathon-smart-city-dashboard.vercel.app", "https://*.vercel.app", "https://*.onrender.com"],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -16,7 +16,7 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000", "https://*.vercel.app", "https://*.onrender.com"],
+  origin: ["http://localhost:5173", "http://localhost:3000", "https://hackathon-smart-city-dashboard.vercel.app", "https://*.vercel.app", "https://*.onrender.com"],
   credentials: true
 }));
 app.use(express.json());
