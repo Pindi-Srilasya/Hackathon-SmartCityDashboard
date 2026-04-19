@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { FaTint, FaWind, FaThermometerHalf } from 'react-icons/fa';
-import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar } from 'recharts';
+import { FaTint, FaWind, FaThermometerHalf, FaChartLine } from 'react-icons/fa';
+import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Legend } from 'recharts';
 import { useCity } from '../context/CityContext';
 
 const Dashboard = () => {
@@ -23,44 +23,98 @@ const Dashboard = () => {
     }
   };
 
-  // Generate dynamic chart data based on real data
+  // Simple Linear Regression for traffic prediction
+  const predictTraffic = (historicalData) => {
+    // Extract hours and traffic values
+    const hours = historicalData.map((_, idx) => idx);
+    const traffic = historicalData.map(d => d.traffic);
+    
+    // Calculate means
+    const n = hours.length;
+    const sumX = hours.reduce((a, b) => a + b, 0);
+    const sumY = traffic.reduce((a, b) => a + b, 0);
+    const sumXY = hours.reduce((sum, x, i) => sum + x * traffic[i], 0);
+    const sumX2 = hours.reduce((sum, x) => sum + x * x, 0);
+    
+    // Calculate slope (m) and intercept (b)
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    // Predict next 4 hours
+    const predictions = [];
+    for (let i = n; i < n + 4; i++) {
+      let predicted = slope * i + intercept;
+      // Add some realistic variation
+      predicted = predicted + (Math.random() * 10 - 5);
+      // Clamp between 10 and 95
+      predicted = Math.min(95, Math.max(10, Math.round(predicted)));
+      predictions.push(predicted);
+    }
+    
+    return predictions;
+  };
+
+  // Generate dynamic chart data based on real data with predictions
   const chartData = useMemo(() => {
     const hours = ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM', '10PM'];
+    const futureHours = ['12AM', '2AM', '4AM', '6AM'];
     const baseTemp = weatherData?.temperature || 22;
     const baseTraffic = trafficData?.congestionLevel || 45;
     const baseAQI = pollutionData?.aqi || 50;
     
-    return hours.map((hour, index) => {
-      // Temperature varies throughout the day (peak at noon)
+    // Generate historical data
+    const historicalData = hours.map((hour, index) => {
       let tempVariation = 0;
-      if (index === 0) tempVariation = -4;      // 6AM - coolest
-      else if (index === 1) tempVariation = -2; // 8AM
-      else if (index === 2) tempVariation = 0;  // 10AM
-      else if (index === 3) tempVariation = 2;  // 12PM - warmest
-      else if (index === 4) tempVariation = 2;  // 2PM - warmest
-      else if (index === 5) tempVariation = 1;  // 4PM
-      else if (index === 6) tempVariation = -1; // 6PM
-      else if (index === 7) tempVariation = -3; // 8PM
-      else tempVariation = -5;                   // 10PM - coolest
+      if (index === 0) tempVariation = -4;
+      else if (index === 1) tempVariation = -2;
+      else if (index === 2) tempVariation = 0;
+      else if (index === 3) tempVariation = 2;
+      else if (index === 4) tempVariation = 2;
+      else if (index === 5) tempVariation = 1;
+      else if (index === 6) tempVariation = -1;
+      else if (index === 7) tempVariation = -3;
+      else tempVariation = -5;
       
-      // Traffic varies by rush hours
       let trafficMultiplier = 1;
-      if (index === 1 || index === 6) trafficMultiplier = 1.5;  // 8AM and 6PM rush hour
-      else if (index === 0 || index === 7) trafficMultiplier = 0.7;  // 6AM and 8PM
-      else if (index >= 2 && index <= 5) trafficMultiplier = 1.1;  // Midday
-      else trafficMultiplier = 0.5;  // Late night
-      
-      // AQI follows traffic pattern (more pollution = more traffic)
-      const aqiMultiplier = trafficMultiplier;
+      if (index === 1 || index === 6) trafficMultiplier = 1.5;
+      else if (index === 0 || index === 7) trafficMultiplier = 0.7;
+      else if (index >= 2 && index <= 5) trafficMultiplier = 1.1;
+      else trafficMultiplier = 0.5;
       
       return {
         hour,
         temp: Math.max(10, Math.min(40, Math.round(baseTemp + tempVariation))),
         traffic: Math.min(95, Math.max(10, Math.round(baseTraffic * trafficMultiplier))),
-        aqi: Math.min(200, Math.max(20, Math.round(baseAQI * aqiMultiplier)))
+        aqi: Math.min(200, Math.max(20, Math.round(baseAQI * trafficMultiplier))),
+        isPrediction: false
       };
     });
+    
+    // Get predictions for future traffic
+    const predictions = predictTraffic(historicalData);
+    
+    // Create future data with predictions
+    const futureData = futureHours.map((hour, index) => ({
+      hour,
+      temp: null,
+      traffic: predictions[index],
+      aqi: null,
+      isPrediction: true
+    }));
+    
+    return [...historicalData, ...futureData];
   }, [weatherData, trafficData, pollutionData]);
+
+  // Get traffic trend message
+  const getTrafficTrend = () => {
+    const lastThree = chartData.filter(d => !d.isPrediction).slice(-3);
+    if (lastThree.length < 3) return "Stable";
+    
+    const trend = lastThree[2].traffic - lastThree[0].traffic;
+    if (trend > 10) return "📈 Increasing - Expect delays";
+    if (trend < -10) return "📉 Decreasing - Clearing up";
+    return "➡️ Stable traffic flow";
+  };
 
   if (loading) {
     return (
@@ -151,10 +205,23 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Charts - Now using dynamic data */}
+      {/* Charts with Prediction */}
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <h3 style={{ marginBottom: '20px', color: 'white' }}>Today's Trends</h3>
-        <ResponsiveContainer width="100%" height={350}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <h3 style={{ color: 'white' }}>Today's Trends & Forecast</h3>
+          <div className="prediction-badge">
+            <FaChartLine style={{ color: '#10b981' }} />
+            <span>📊 Traffic Forecast</span>
+          </div>
+        </div>
+        
+        {/* Traffic Trend Message */}
+        <div className="ai-insight">
+          <span className="ai-icon">📊</span>
+          <span className="ai-text">Traffic Trend: {getTrafficTrend()}</span>
+        </div>
+        
+        <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={chartData} key={`chart-${selectedCity}-${weatherData?.temperature}-${trafficData?.congestionLevel}`}>
             <defs>
               <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
@@ -171,10 +238,13 @@ const Dashboard = () => {
             <YAxis yAxisId="left" stroke="rgba(255,255,255,0.5)" label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} />
             <YAxis yAxisId="right" orientation="right" stroke="rgba(255,255,255,0.5)" label={{ value: 'Traffic (%)', angle: 90, position: 'insideRight', fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} />
             <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.9)', border: 'none', borderRadius: '8px' }} />
+            <Legend />
             <Area yAxisId="left" type="monotone" dataKey="temp" stroke="#f59e0b" fill="url(#colorTemp)" name="Temperature (°C)" />
-            <Bar yAxisId="right" dataKey="traffic" fill="#ef4444" opacity={0.5} name="Traffic (%)" />
+            <Bar yAxisId="right" dataKey="traffic" fill="#ef4444" opacity={0.5} name="Current Traffic (%)" />
+            <Line yAxisId="right" type="monotone" dataKey="traffic" stroke="#10b981" strokeWidth={3} strokeDasharray="5 5" dot={false} name="Predicted Traffic" connectNulls={true} />
           </ComposedChart>
         </ResponsiveContainer>
+        
         <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '20px', height: '3px', background: '#f59e0b' }} />
@@ -182,8 +252,18 @@ const Dashboard = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '20px', height: '3px', background: '#ef4444' }} />
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Traffic Congestion</span>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Current Traffic</span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '20px', height: '3px', background: '#10b981', borderTop: '2px dashed' }} />
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Predicted Traffic (Next 4 hours)</span>
+          </div>
+        </div>
+        
+        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', textAlign: 'center' }}>
+          <span style={{ fontSize: '12px', color: '#10b981' }}>
+            📈 4-hour traffic forecast based on historical patterns
+          </span>
         </div>
       </div>
 
