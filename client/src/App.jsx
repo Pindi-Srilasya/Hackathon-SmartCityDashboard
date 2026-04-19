@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import MapView from './pages/MapView';
@@ -7,6 +7,23 @@ import './index.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Live clock effect - ADD THIS HERE
+  useEffect(() => {
+    const updateClock = () => {
+      const clock = document.getElementById('live-clock');
+      if (clock) {
+        clock.textContent = new Date().toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const tabs = [
     { id: 'dashboard', name: '📊 Dashboard', icon: '📊' },
@@ -36,6 +53,7 @@ function App() {
           ))}
         </div>
         <div className="nav-right">
+          <div className="live-clock" id="live-clock"></div>
           <div className="live-badge">
             <span className="live-dot"></span>
             LIVE

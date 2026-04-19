@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaTicketAlt, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaClock, FaTicketAlt } from 'react-icons/fa';
+import { useCity } from '../context/CityContext';
 
 const EventsPage = () => {
-  const [events, setEvents] = useState([]);
+  const { selectedCity, eventsData, loading } = useCity();
   const [filteredEvents, setFilteredEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [city, setCity] = useState('New York');
-  const [searchCity, setSearchCity] = useState('New York');
 
   const categories = [
     { id: 'all', name: 'All Events', icon: '🎪' },
@@ -21,27 +18,11 @@ const EventsPage = () => {
   ];
 
   useEffect(() => {
-    fetchEvents();
-  }, [city]);
-
-  useEffect(() => {
     filterEvents();
-  }, [searchTerm, selectedCategory, events]);
-
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`http://localhost:5000/api/events?city=${city}`);
-      setEvents(response.data.data || []);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [searchTerm, selectedCategory, eventsData]);
 
   const filterEvents = () => {
-    let filtered = [...events];
+    let filtered = eventsData ? [...eventsData] : [];
     
     if (searchTerm) {
       filtered = filtered.filter(event => 
@@ -57,10 +38,6 @@ const EventsPage = () => {
     }
     
     setFilteredEvents(filtered);
-  };
-
-  const handleSearchCity = () => {
-    setCity(searchCity);
   };
 
   const formatDate = (dateString) => {
@@ -90,13 +67,13 @@ const EventsPage = () => {
       {/* Header */}
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '28px', marginBottom: '8px', color: 'white' }}>City Events</h2>
-        <p style={{ color: 'rgba(255,255,255,0.6)' }}>Discover and explore events happening in your city</p>
+        <p style={{ color: 'rgba(255,255,255,0.6)' }}>Discover and explore events happening in {selectedCity}</p>
       </div>
 
       {/* Search Section */}
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
-          <div className="search-box" style={{ flex: 2 }}>
+          <div className="search-box" style={{ flex: 1 }}>
             <span className="search-icon">🔍</span>
             <input
               type="text"
@@ -105,18 +82,6 @@ const EventsPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </div>
-          <div className="search-box" style={{ flex: 1 }}>
-            <span className="search-icon">📍</span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="City name..."
-              value={searchCity}
-              onChange={(e) => setSearchCity(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearchCity()}
-            />
-            <button className="search-button" onClick={handleSearchCity}>Change City</button>
           </div>
         </div>
 
@@ -150,7 +115,7 @@ const EventsPage = () => {
       {/* Results Count */}
       <div style={{ marginBottom: '20px' }}>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
-          Found {filteredEvents.length} events in {city}
+          Found {filteredEvents.length} events in {selectedCity}
         </p>
       </div>
 
@@ -158,7 +123,7 @@ const EventsPage = () => {
       {loading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading events...</p>
+          <p>Loading events for {selectedCity}...</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '20px' }}>
@@ -168,7 +133,6 @@ const EventsPage = () => {
               return (
                 <div key={idx} className="glass-card" style={{ padding: '20px', transition: 'all 0.3s ease', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', gap: '16px' }}>
-                    {/* Event Image Placeholder */}
                     <div style={{
                       width: '80px',
                       height: '80px',
@@ -184,7 +148,6 @@ const EventsPage = () => {
                        event.category?.toLowerCase().includes('festival') ? '🎉' : '🎪'}
                     </div>
                     
-                    {/* Event Details */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>{event.title}</h4>
@@ -228,7 +191,7 @@ const EventsPage = () => {
             <div className="glass-card" style={{ padding: '60px', textAlign: 'center', gridColumn: '1 / -1' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎭</div>
               <h3 style={{ color: 'white', marginBottom: '8px' }}>No events found</h3>
-              <p style={{ color: 'rgba(255,255,255,0.5)' }}>Try changing your search criteria or city</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)' }}>Try changing your search criteria</p>
             </div>
           )}
         </div>

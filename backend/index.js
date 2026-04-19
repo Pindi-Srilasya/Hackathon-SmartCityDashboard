@@ -32,7 +32,7 @@ app.get('/api/weather', async (req, res) => {
     const axios = require('axios');
     const apiKey = process.env.OPENWEATHER_API_KEY;
     const city = req.query.city || 'New York';
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`;
     
     const response = await axios.get(url);
     res.json({
@@ -47,11 +47,12 @@ app.get('/api/weather', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Weather API Error:', error.message);
     res.json({
       success: false,
       message: 'Weather API error, showing mock data',
       data: {
-        city: 'New York',
+        city: req.query.city || 'New York',
         temperature: Math.floor(Math.random() * 25) + 10,
         feelsLike: Math.floor(Math.random() * 25) + 8,
         humidity: Math.floor(Math.random() * 60) + 30,
@@ -62,32 +63,38 @@ app.get('/api/weather', async (req, res) => {
   }
 });
 
-// Events from Ticketmaster
+// Events from Ticketmaster - FIXED (removed countryCode=US)
 app.get('/api/events', async (req, res) => {
   try {
     const axios = require('axios');
     const apiKey = process.env.TICKETMASTER_API_KEY;
     const city = req.query.city || 'New York';
-    const url = `https://app.ticketmaster.com/discovery/v2/events.json?city=${city}&countryCode=US&size=10&apikey=${apiKey}`;
     
+    // REMOVED &countryCode=US to allow international city search
+    const url = `https://app.ticketmaster.com/discovery/v2/events.json?city=${encodeURIComponent(city)}&size=10&apikey=${apiKey}`;
+    
+    console.log(`Fetching events for city: ${city}`);
     const response = await axios.get(url);
     
-    if (response.data._embedded && response.data._embedded.events) {
+    if (response.data._embedded && response.data._embedded.events && response.data._embedded.events.length > 0) {
       const events = response.data._embedded.events.map(event => ({
         title: event.name,
-        description: event.info || 'Exciting city event',
+        description: event.info || event.description || 'Exciting city event',
         category: event.classifications?.[0]?.segment?.name || 'Entertainment',
         venue: event._embedded?.venues?.[0]?.name || 'City Venue',
         date: event.dates?.start?.localDate || new Date(),
         url: event.url,
         image: event.images?.[0]?.url || ''
       }));
+      console.log(`Found ${events.length} events for ${city}`);
       res.json({ success: true, data: events });
     } else {
-      res.json({ success: true, data: getMockEvents() });
+      console.log(`No events found for ${city}`);
+      res.json({ success: true, data: [] });
     }
   } catch (error) {
-    res.json({ success: true, data: getMockEvents() });
+    console.error('Events API Error:', error.message);
+    res.json({ success: true, data: [] });
   }
 });
 
@@ -109,6 +116,7 @@ app.get('/api/pollution', async (req, res) => {
         success: true,
         data: {
           aqi: pm25 ? calculateAQI(pm25.value) : Math.floor(Math.random() * 100) + 20,
+          aqiLevel: pm25 ? getAQILevel(pm25.value) : 'Moderate',
           pm25: pm25?.value || Math.floor(Math.random() * 100),
           pm10: measurements.find(m => m.parameter === 'pm10')?.value || Math.floor(Math.random() * 150),
           no2: measurements.find(m => m.parameter === 'no2')?.value || Math.floor(Math.random() * 50)
@@ -118,6 +126,7 @@ app.get('/api/pollution', async (req, res) => {
       res.json({ success: true, data: getMockPollution() });
     }
   } catch (error) {
+    console.error('Pollution API Error:', error.message);
     res.json({ success: true, data: getMockPollution() });
   }
 });
@@ -147,9 +156,11 @@ app.get('/api/traffic', (req, res) => {
 
 // Dashboard summary (combines all data)
 app.get('/api/dashboard', async (req, res) => {
+  const city = req.query.city || 'New York';
+  
   const [weather, events, pollution, traffic] = await Promise.all([
-    fetch(`${req.protocol}://${req.get('host')}/api/weather`).then(r => r.json()),
-    fetch(`${req.protocol}://${req.get('host')}/api/events`).then(r => r.json()),
+    fetch(`${req.protocol}://${req.get('host')}/api/weather?city=${city}`).then(r => r.json()),
+    fetch(`${req.protocol}://${req.get('host')}/api/events?city=${city}`).then(r => r.json()),
     fetch(`${req.protocol}://${req.get('host')}/api/pollution`).then(r => r.json()),
     fetch(`${req.protocol}://${req.get('host')}/api/traffic`).then(r => r.json())
   ]);
@@ -202,17 +213,10 @@ io.on('connection', (socket) => {
 });
 
 // Helper functions
-function getMockEvents() {
-  return [
-    { title: 'Summer Music Festival', description: 'Annual music festival', category: 'Concert', venue: 'Central Park' },
-    { title: 'Food Truck Rally', description: 'Food festival downtown', category: 'Festival', venue: 'Downtown' },
-    { title: 'Art Exhibition', description: 'Local artists showcase', category: 'Exhibition', venue: 'Art Gallery' }
-  ];
-}
-
 function getMockPollution() {
   return {
     aqi: Math.floor(Math.random() * 100) + 20,
+    aqiLevel: 'Moderate',
     pm25: Math.floor(Math.random() * 80) + 10,
     pm10: Math.floor(Math.random() * 120) + 20,
     no2: Math.floor(Math.random() * 40) + 5
@@ -227,6 +231,14 @@ function calculateAQI(pm25) {
   return 300;
 }
 
+function getAQILevel(pm25) {
+  if (pm25 <= 12) return 'Good';
+  if (pm25 <= 35.4) return 'Moderate';
+  if (pm25 <= 55.4) return 'Unhealthy for Sensitive';
+  if (pm25 <= 150.4) return 'Unhealthy';
+  return 'Very Unhealthy';
+}
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
@@ -234,10 +246,10 @@ server.listen(PORT, () => {
   console.log(`📡 Server: http://localhost:${PORT}`);
   console.log(`\n📊 Test these endpoints:`);
   console.log(`   - Health: http://localhost:${PORT}/api/health`);
-  console.log(`   - Weather: http://localhost:${PORT}/api/weather`);
-  console.log(`   - Events: http://localhost:${PORT}/api/events`);
+  console.log(`   - Weather: http://localhost:${PORT}/api/weather?city=London`);
+  console.log(`   - Events: http://localhost:${PORT}/api/events?city=London`);
   console.log(`   - Pollution: http://localhost:${PORT}/api/pollution`);
   console.log(`   - Traffic: http://localhost:${PORT}/api/traffic`);
-  console.log(`   - Dashboard: http://localhost:${PORT}/api/dashboard`);
+  console.log(`   - Dashboard: http://localhost:${PORT}/api/dashboard?city=London`);
   console.log(`\n🔌 WebSocket: ws://localhost:${PORT}\n`);
 });

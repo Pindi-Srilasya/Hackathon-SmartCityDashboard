@@ -1,23 +1,47 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FaMapMarkerAlt, FaExpand, FaCompress, FaSearch } from 'react-icons/fa';
+import { useCity } from '../context/CityContext';
 
 const MapView = () => {
   const mapContainerRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
-  const [searchLocation, setSearchLocation] = useState('');
+  const { selectedCity, trafficData, pollutionData } = useCity();
 
-  const locations = [
-    { id: 1, name: 'Downtown', lat: 40.7128, lng: -74.0060, traffic: 85, aqi: 68, type: 'business' },
-    { id: 2, name: 'Central Park', lat: 40.7829, lng: -73.9654, traffic: 25, aqi: 38, type: 'park' },
-    { id: 3, name: 'Times Square', lat: 40.7580, lng: -73.9855, traffic: 92, aqi: 72, type: 'tourist' },
-    { id: 4, name: 'Brooklyn Bridge', lat: 40.7061, lng: -73.9969, traffic: 78, aqi: 58, type: 'landmark' },
-    { id: 5, name: 'Financial District', lat: 40.7075, lng: -74.0113, traffic: 82, aqi: 65, type: 'business' },
-    { id: 6, name: 'Williamsburg', lat: 40.7081, lng: -73.9570, traffic: 55, aqi: 48, type: 'arts' },
-  ];
+  // Get coordinates based on city (using OpenStreetMap Nominatim)
+  const getCityCoordinates = async (cityName) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+          displayName: data[0].display_name
+        };
+      }
+      return { lat: 40.7128, lng: -74.0060 }; // Default to NYC
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return { lat: 40.7128, lng: -74.0060 };
+    }
+  };
+
+  // Generate points of interest around the city
+  const generateLocations = (centerLat, centerLng, cityName) => {
+    const offset = 0.05; // About 5km offset
+    return [
+      { id: 1, name: `${cityName} Downtown`, lat: centerLat, lng: centerLng, traffic: trafficData?.congestionLevel || 45, aqi: pollutionData?.aqi || 50, type: 'business' },
+      { id: 2, name: `${cityName} Central Park`, lat: centerLat + 0.04, lng: centerLng - 0.03, traffic: 25, aqi: 38, type: 'park' },
+      { id: 3, name: `${cityName} Plaza`, lat: centerLat - 0.02, lng: centerLng + 0.02, traffic: 65, aqi: 55, type: 'tourist' },
+      { id: 4, name: `${cityName} University`, lat: centerLat + 0.01, lng: centerLng - 0.04, traffic: 48, aqi: 42, type: 'arts' },
+      { id: 5, name: `${cityName} Business District`, lat: centerLat - 0.03, lng: centerLng - 0.01, traffic: 72, aqi: 58, type: 'business' },
+    ];
+  };
 
   useEffect(() => {
-    const loadLeaflet = async () => {
+    const loadMap = async () => {
       const L = await import('leaflet');
       
       delete L.Icon.Default.prototype._getIconUrl;
@@ -27,9 +51,18 @@ const MapView = () => {
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
       });
 
-      if (!mapContainerRef.current || mapLoaded) return;
+      if (!mapContainerRef.current) return;
 
-      const map = L.map(mapContainerRef.current).setView([40.7128, -74.0060], 12);
+      // Get coordinates for the selected city
+      const coords = await getCityCoordinates(selectedCity);
+      const locations = generateLocations(coords.lat, coords.lng, selectedCity);
+
+      // Remove existing map if any
+      if (window.cityMap) {
+        window.cityMap.remove();
+      }
+
+      const map = L.map(mapContainerRef.current).setView([coords.lat, coords.lng], 12);
       
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors',
@@ -71,7 +104,7 @@ const MapView = () => {
       setMapLoaded(true);
     };
 
-    loadLeaflet();
+    loadMap();
 
     return () => {
       if (window.cityMap) {
@@ -79,39 +112,16 @@ const MapView = () => {
         window.cityMap = null;
       }
     };
-  }, []);
-
-  const handleSearch = () => {
-    if (window.cityMap && searchLocation) {
-      // Simple geocoding simulation
-      const found = locations.find(l => l.name.toLowerCase().includes(searchLocation.toLowerCase()));
-      if (found) {
-        window.cityMap.setView([found.lat, found.lng], 14);
-        setSelectedLocation(found);
-      }
-    }
-  };
+  }, [selectedCity, trafficData, pollutionData]);
 
   return (
     <div>
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h2 style={{ fontSize: '28px', marginBottom: '8px', color: 'white' }}>Interactive City Map</h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)' }}>Real-time traffic and air quality data by location</p>
-          </div>
-          <div className="search-box" style={{ width: '300px' }}>
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search location..."
-              value={searchLocation}
-              onChange={(e) => setSearchLocation(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            <button className="search-button" onClick={handleSearch}>Go</button>
-          </div>
+        <div>
+          <h2 style={{ fontSize: '28px', marginBottom: '8px', color: 'white' }}>Interactive City Map</h2>
+          <p style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Real-time traffic and air quality data for {selectedCity}
+          </p>
         </div>
       </div>
 

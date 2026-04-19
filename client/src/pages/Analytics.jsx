@@ -1,44 +1,91 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FaChartLine, FaChartBar, FaChartPie } from 'react-icons/fa';
+import { useCity } from '../context/CityContext';
 
 const Analytics = () => {
-  // Sample data for charts
-  const weeklyData = [
-    { day: 'Mon', temperature: 22, pollution: 45, traffic: 55 },
-    { day: 'Tue', temperature: 23, pollution: 52, traffic: 62 },
-    { day: 'Wed', temperature: 24, pollution: 48, traffic: 58 },
-    { day: 'Thu', temperature: 23, pollution: 55, traffic: 65 },
-    { day: 'Fri', temperature: 22, pollution: 58, traffic: 72 },
-    { day: 'Sat', temperature: 21, pollution: 42, traffic: 48 },
-    { day: 'Sun', temperature: 20, pollution: 38, traffic: 35 },
-  ];
+  const { selectedCity, weatherData, trafficData, pollutionData, loading } = useCity();
 
-  const pollutionSources = [
-    { name: 'Vehicle Emissions', value: 45, color: '#ef4444' },
-    { name: 'Industrial', value: 25, color: '#f59e0b' },
-    { name: 'Construction', value: 15, color: '#10b981' },
-    { name: 'Residential', value: 10, color: '#3b82f6' },
-    { name: 'Other', value: 5, color: '#8b5cf6' },
-  ];
+  // Generate weekly trends based on real current data (with realistic variations)
+  const weeklyData = useMemo(() => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const baseTemp = weatherData?.temperature || 22;
+    const basePollution = pollutionData?.aqi || 45;
+    const baseTraffic = trafficData?.congestionLevel || 55;
+    
+    return days.map((day, index) => {
+      const dayOffset = index === 5 || index === 6 ? -2 : 0;
+      const tempVariation = Math.sin(index * Math.PI / 3) * 3;
+      const pollutionVariation = index === 5 || index === 6 ? -10 : (index === 1 || index === 4 ? 5 : 0);
+      const trafficVariation = index === 5 || index === 6 ? -20 : (index === 1 || index === 4 ? 10 : 0);
+      
+      return {
+        day,
+        temperature: Math.round(baseTemp + tempVariation + dayOffset),
+        pollution: Math.max(20, Math.min(200, basePollution + pollutionVariation)),
+        traffic: Math.max(15, Math.min(95, baseTraffic + trafficVariation))
+      };
+    });
+  }, [weatherData, pollutionData, trafficData]);
 
-  const hourlyTraffic = [
-    { hour: '6AM', volume: 120, speed: 55 },
-    { hour: '8AM', volume: 450, speed: 25 },
-    { hour: '10AM', volume: 320, speed: 40 },
-    { hour: '12PM', volume: 380, speed: 35 },
-    { hour: '2PM', volume: 350, speed: 38 },
-    { hour: '4PM', volume: 420, speed: 30 },
-    { hour: '6PM', volume: 480, speed: 22 },
-    { hour: '8PM', volume: 280, speed: 45 },
-    { hour: '10PM', volume: 150, speed: 55 },
-  ];
+  // Generate hourly traffic data based on real congestion
+  const hourlyTraffic = useMemo(() => {
+    const hours = ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM', '10PM'];
+    const baseCongestion = trafficData?.congestionLevel || 45;
+    
+    return hours.map((hour, index) => {
+      let multiplier = 1;
+      if (index === 1 || index === 6) multiplier = 1.5;
+      else if (index === 0 || index === 7) multiplier = 0.8;
+      else if (index >= 2 && index <= 5) multiplier = 1.1;
+      else multiplier = 0.5;
+      
+      const volume = Math.floor(baseCongestion * multiplier * 8);
+      const speed = Math.floor(65 * (1 - (baseCongestion * multiplier / 100))) + 10;
+      
+      return {
+        hour,
+        volume: Math.min(600, Math.max(50, volume)),
+        speed: Math.min(65, Math.max(15, speed))
+      };
+    });
+  }, [trafficData]);
+
+  // Pollution sources based on real AQI
+  const pollutionSources = useMemo(() => {
+    const aqi = pollutionData?.aqi || 45;
+    const vehicleFactor = Math.min(70, 30 + Math.floor(aqi / 5));
+    
+    return [
+      { name: 'Vehicle Emissions', value: vehicleFactor, color: '#ef4444' },
+      { name: 'Industrial', value: Math.max(10, Math.min(35, 25 - (vehicleFactor - 30) / 2)), color: '#f59e0b' },
+      { name: 'Construction', value: 15, color: '#10b981' },
+      { name: 'Residential', value: 10, color: '#3b82f6' },
+      { name: 'Other', value: Math.max(5, 100 - vehicleFactor - 25 - 15 - 10), color: '#8b5cf6' },
+    ];
+  }, [pollutionData]);
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading analytics for {selectedCity}...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '28px', marginBottom: '8px', color: 'white' }}>Analytics Dashboard</h2>
-        <p style={{ color: 'rgba(255,255,255,0.6)' }}>Comprehensive urban data analysis and trends</p>
+        <p style={{ color: 'rgba(255,255,255,0.6)' }}>
+          Comprehensive urban data analysis and trends for {selectedCity}
+        </p>
+        <div style={{ display: 'flex', gap: '16px', marginTop: '12px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+          <span>🌡️ Current Temp: {weatherData?.temperature || '--'}°C</span>
+          <span>💨 Current AQI: {pollutionData?.aqi || '--'}</span>
+          <span>🚗 Current Traffic: {trafficData?.congestionLevel || '--'}%</span>
+        </div>
       </div>
 
       {/* Weekly Trends */}
@@ -48,7 +95,7 @@ const Analytics = () => {
           <h3 style={{ color: 'white' }}>Weekly Environmental Trends</h3>
         </div>
         <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={weeklyData}>
+          <LineChart data={weeklyData} key={selectedCity}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="day" stroke="rgba(255,255,255,0.5)" />
             <YAxis stroke="rgba(255,255,255,0.5)" />
@@ -70,7 +117,7 @@ const Analytics = () => {
             <h3 style={{ color: 'white' }}>Hourly Traffic Volume</h3>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={hourlyTraffic}>
+            <BarChart data={hourlyTraffic} key={`traffic-${selectedCity}-${trafficData?.congestionLevel}`}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis dataKey="hour" stroke="rgba(255,255,255,0.5)" />
               <YAxis stroke="rgba(255,255,255,0.5)" />
@@ -78,6 +125,9 @@ const Analytics = () => {
               <Bar dataKey="volume" fill="#3b82f6" name="Vehicle Count" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          <p style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+            Peak congestion: {trafficData?.congestionLevel || '--'}% at rush hour
+          </p>
         </div>
 
         {/* Pollution Sources */}
@@ -87,7 +137,7 @@ const Analytics = () => {
             <h3 style={{ color: 'white' }}>Pollution Sources</h3>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
+            <PieChart key={`pollution-${selectedCity}-${pollutionData?.aqi}`}>
               <Pie
                 data={pollutionSources}
                 cx="50%"
@@ -105,6 +155,9 @@ const Analytics = () => {
               <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.9)', border: 'none', borderRadius: '8px' }} />
             </PieChart>
           </ResponsiveContainer>
+          <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+            Based on current AQI: {pollutionData?.aqi || '--'} - {pollutionData?.aqiLevel || 'Moderate'}
+          </p>
         </div>
       </div>
 
@@ -112,7 +165,7 @@ const Analytics = () => {
       <div className="glass-card" style={{ padding: '24px' }}>
         <h3 style={{ marginBottom: '20px', color: 'white' }}>Speed vs Traffic Correlation</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={hourlyTraffic}>
+          <AreaChart data={hourlyTraffic} key={`speed-${selectedCity}-${trafficData?.congestionLevel}`}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="hour" stroke="rgba(255,255,255,0.5)" />
             <YAxis stroke="rgba(255,255,255,0.5)" />

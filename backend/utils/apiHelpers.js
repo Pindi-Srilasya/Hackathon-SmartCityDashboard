@@ -32,113 +32,123 @@ class APIHelpers {
   }
   
   // Fetch pollution data from OpenAQ
-  // In backend/utils/apiHelpers.js - Simplified pollution method (NO API KEY NEEDED)
-
-static async fetchPollutionData(lat = 40.7128, lon = -74.0060) {
-  try {
-    // OpenAQ works without any API key! Just use the public endpoint
-    const url = `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=5000&limit=1`;
-    
-    const response = await axios.get(url);
-    
-    if (response.data.results && response.data.results[0]) {
-      const measurements = response.data.results[0].measurements;
-      
-      // Extract pollutant values
-      const pm25 = this.findMeasurement(measurements, 'pm25');
-      const pm10 = this.findMeasurement(measurements, 'pm10');
-      const no2 = this.findMeasurement(measurements, 'no2');
-      const so2 = this.findMeasurement(measurements, 'so2');
-      const o3 = this.findMeasurement(measurements, 'o3');
-      const co = this.findMeasurement(measurements, 'co');
-      
-      // Calculate AQI based on PM2.5 (common method)
-      const aqi = this.calculateAQI(measurements);
-      
-      return {
-        aqi: aqi.value,
-        aqiLevel: aqi.level,
-        pm25: pm25 || Math.floor(Math.random() * 50) + 10,
-        pm10: pm10 || Math.floor(Math.random() * 80) + 20,
-        no2: no2 || Math.floor(Math.random() * 40) + 5,
-        so2: so2 || Math.floor(Math.random() * 15) + 1,
-        o3: o3 || Math.floor(Math.random() * 60) + 10,
-        co: co || Math.floor(Math.random() * 8) + 1
-      };
-    }
-    
-    // Fallback to mock data if no real data available
-    return this.getMockPollutionData();
-  } catch (error) {
-    console.error('OpenAQ API Error (using mock data):', error.message);
-    return this.getMockPollutionData();
-  }
-}
-
-static findMeasurement(measurements, parameter) {
-  const measurement = measurements?.find(m => m.parameter === parameter);
-  return measurement ? Math.round(measurement.value) : null;
-}
-
-static calculateAQI(measurements) {
-  const pm25 = this.findMeasurement(measurements, 'pm25');
-  
-  if (!pm25) {
-    return { value: Math.floor(Math.random() * 100) + 20, level: 'Moderate' };
-  }
-  
-  // EPA AQI calculation for PM2.5
-  let value, level;
-  if (pm25 <= 12) { value = 50; level = 'Good'; }
-  else if (pm25 <= 35.4) { value = 100; level = 'Moderate'; }
-  else if (pm25 <= 55.4) { value = 150; level = 'Unhealthy for Sensitive'; }
-  else if (pm25 <= 150.4) { value = 200; level = 'Unhealthy'; }
-  else if (pm25 <= 250.4) { value = 300; level = 'Very Unhealthy'; }
-  else { value = 500; level = 'Hazardous'; }
-  
-  return { value, level };
-}
-  
-  // Fetch traffic incidents from TomTom
-  static async fetchTrafficData(lat = 40.7128, lon = -74.0060) {
+  static async fetchPollutionData(lat = 40.7128, lon = -74.0060) {
     try {
-      const apiKey = process.env.TOMTOM_API_KEY;
-      const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=-74.05,40.68,-73.95,40.78&fields=%7B%22incidents%22%3A%7B%22id%22%3Atrue%2C%22type%22%3Atrue%2C%22severity%22%3Atrue%2C%22description%22%3Atrue%2C%22location%22%3Atrue%7D%7D&key=${apiKey}`;
+      const url = `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=5000&limit=1`;
       
       const response = await axios.get(url);
       
-      if (response.data.incidents) {
-        const incidents = response.data.incidents.slice(0, 5).map(incident => ({
-          type: incident.type,
-          severity: this.getSeverityLevel(incident.severity),
-          description: incident.description,
-          location: incident.location
-        }));
+      if (response.data.results && response.data.results[0]) {
+        const measurements = response.data.results[0].measurements;
+        
+        const pm25 = this.findMeasurement(measurements, 'pm25');
+        const pm10 = this.findMeasurement(measurements, 'pm10');
+        const no2 = this.findMeasurement(measurements, 'no2');
+        const so2 = this.findMeasurement(measurements, 'so2');
+        const o3 = this.findMeasurement(measurements, 'o3');
+        const co = this.findMeasurement(measurements, 'co');
+        
+        const aqi = this.calculateAQI(measurements);
         
         return {
-          congestionLevel: Math.floor(Math.random() * 100),
-          incidents: incidents,
-          averageSpeed: Math.floor(Math.random() * 60) + 20
+          aqi: aqi.value,
+          aqiLevel: aqi.level,
+          pm25: pm25 || Math.floor(Math.random() * 50) + 10,
+          pm10: pm10 || Math.floor(Math.random() * 80) + 20,
+          no2: no2 || Math.floor(Math.random() * 40) + 5,
+          so2: so2 || Math.floor(Math.random() * 15) + 1,
+          o3: o3 || Math.floor(Math.random() * 60) + 10,
+          co: co || Math.floor(Math.random() * 8) + 1
         };
       }
-      return this.getMockTrafficData();
+      
+      return this.getMockPollutionData();
+    } catch (error) {
+      console.error('OpenAQ API Error (using mock data):', error.message);
+      return this.getMockPollutionData();
+    }
+  }
+
+  static findMeasurement(measurements, parameter) {
+    const measurement = measurements?.find(m => m.parameter === parameter);
+    return measurement ? Math.round(measurement.value) : null;
+  }
+
+  static calculateAQI(measurements) {
+    const pm25 = this.findMeasurement(measurements, 'pm25');
+    
+    if (!pm25) {
+      return { value: Math.floor(Math.random() * 100) + 20, level: 'Moderate' };
+    }
+    
+    let value, level;
+    if (pm25 <= 12) { value = 50; level = 'Good'; }
+    else if (pm25 <= 35.4) { value = 100; level = 'Moderate'; }
+    else if (pm25 <= 55.4) { value = 150; level = 'Unhealthy for Sensitive'; }
+    else if (pm25 <= 150.4) { value = 200; level = 'Unhealthy'; }
+    else if (pm25 <= 250.4) { value = 300; level = 'Very Unhealthy'; }
+    else { value = 500; level = 'Hazardous'; }
+    
+    return { value, level };
+  }
+  
+  // Fetch traffic incidents (smart mock)
+  static async fetchTrafficData(lat = 40.7128, lon = -74.0060) {
+    try {
+      // Smart traffic mock based on time of day
+      const currentHour = new Date().getHours();
+      const isRushHour = (currentHour >= 8 && currentHour <= 10) || (currentHour >= 17 && currentHour <= 19);
+      const isWeekend = [0, 6].includes(new Date().getDay());
+      
+      let congestion = 40;
+      if (isRushHour && !isWeekend) congestion = 85;
+      else if (isWeekend) congestion = 55;
+      else if (currentHour >= 22 || currentHour <= 6) congestion = 15;
+      
+      const congestionLevel = Math.floor(congestion + (Math.random() * 20 - 10));
+      const averageSpeed = Math.floor(65 * (1 - congestionLevel / 100)) + 10;
+      
+      const incidents = [];
+      if (Math.random() > 0.7) {
+        incidents.push({
+          type: 'Accident',
+          severity: Math.random() > 0.6 ? 'high' : 'medium',
+          description: 'Traffic incident reported',
+          location: 'Main intersection'
+        });
+      }
+      
+      return {
+        congestionLevel: Math.min(100, Math.max(0, congestionLevel)),
+        incidents: incidents,
+        averageSpeed: Math.max(5, averageSpeed)
+      };
     } catch (error) {
       console.error('Traffic API Error:', error.message);
       return this.getMockTrafficData();
     }
   }
   
-  // Fetch city events from Ticketmaster API (Free)
+  // Fetch city events from Ticketmaster API - FIXED (removed countryCode=US)
   static async fetchCityEvents(city = 'New York') {
     try {
-      const url = `https://app.ticketmaster.com/discovery/v2/events.json?city=${city}&countryCode=US&size=10&apikey=${process.env.TICKETMASTER_API_KEY || 'DEMO_KEY'}`;
+      const apiKey = process.env.TICKETMASTER_API_KEY;
       
+      if (!apiKey || apiKey === 'your_ticketmaster_api_key_here') {
+        console.log('No Ticketmaster API key provided');
+        return [];
+      }
+      
+      // REMOVED &countryCode=US to allow international city search
+      const url = `https://app.ticketmaster.com/discovery/v2/events.json?city=${encodeURIComponent(city)}&size=10&apikey=${apiKey}`;
+      
+      console.log(`Fetching events for city: ${city}`);
       const response = await axios.get(url);
       
       if (response.data._embedded && response.data._embedded.events) {
-        return response.data._embedded.events.map(event => ({
+        const events = response.data._embedded.events.map(event => ({
           title: event.name,
-          description: event.description || 'Exciting city event',
+          description: event.info || event.description || 'Exciting city event',
           category: event.classifications?.[0]?.segment?.name || 'Entertainment',
           location: {
             name: event._embedded?.venues?.[0]?.name || 'City Venue',
@@ -153,36 +163,19 @@ static calculateAQI(measurements) {
           imageUrl: event.images?.[0]?.url || '',
           price: event.priceRanges?.[0]?.min ? `$${event.priceRanges[0].min}` : 'Free'
         }));
+        console.log(`Found ${events.length} events for ${city}`);
+        return events;
       }
-      return this.getMockEvents();
+      
+      console.log(`No events found for ${city}`);
+      return [];
     } catch (error) {
-      console.error('Events API Error:', error.message);
-      return this.getMockEvents();
+      console.error('Ticketmaster API Error:', error.response?.data?.message || error.message);
+      return [];
     }
   }
   
   // Helper methods
-  static calculateAQI(measurements) {
-    const pm25 = this.findMeasurement(measurements, 'pm25') || 0;
-    
-    let value = 0;
-    let level = 'Good';
-    
-    if (pm25 <= 12) { value = 50; level = 'Good'; }
-    else if (pm25 <= 35.4) { value = 100; level = 'Moderate'; }
-    else if (pm25 <= 55.4) { value = 150; level = 'Unhealthy for Sensitive'; }
-    else if (pm25 <= 150.4) { value = 200; level = 'Unhealthy'; }
-    else if (pm25 <= 250.4) { value = 300; level = 'Very Unhealthy'; }
-    else { value = 500; level = 'Hazardous'; }
-    
-    return { value, level };
-  }
-  
-  static findMeasurement(measurements, parameter) {
-    const measurement = measurements.find(m => m.parameter === parameter);
-    return measurement ? Math.round(measurement.value) : null;
-  }
-  
   static getSeverityLevel(severity) {
     if (severity <= 2) return 'low';
     if (severity <= 4) return 'medium';
@@ -212,23 +205,6 @@ static calculateAQI(measurements) {
       ],
       averageSpeed: Math.floor(Math.random() * 60) + 20
     };
-  }
-  
-  static getMockEvents() {
-    return [
-      {
-        title: 'Summer Music Festival',
-        description: 'Annual city music festival',
-        category: 'Concert',
-        location: { name: 'Central Park', lat: 40.7829, lng: -73.9654, address: 'Central Park, NY' },
-        startTime: new Date(),
-        endTime: new Date(Date.now() + 86400000),
-        source: 'City Events',
-        importance: 'high',
-        imageUrl: 'https://via.placeholder.com/300',
-        price: '$25'
-      }
-    ];
   }
 }
 
