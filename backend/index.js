@@ -8,13 +8,17 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:3000"],
-    methods: ["GET", "POST"]
+    origin: ["http://localhost:5173", "http://localhost:3000", "https://*.vercel.app", "https://*.onrender.com"],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:5173", "http://localhost:3000", "https://*.vercel.app", "https://*.onrender.com"],
+  credentials: true
+}));
 app.use(express.json());
 
 // Health check
